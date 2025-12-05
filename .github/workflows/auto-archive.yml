@@ -1,0 +1,37 @@
+name: 🔒 Auto Archive Repository After Deadline
+
+on:
+  schedule:
+    - cron: "58 23 6 12 *"   # 23:58 UTC on 6 December 2025
+  workflow_dispatch:          # Manual trigger from Actions tab
+
+jobs:
+  archive-repo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🕒 Get current date
+        id: get_date
+        run: echo "date=$(date -u +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_ENV
+
+      - name: 🗓️ Check if deadline passed
+        id: check_deadline
+        run: |
+          DEADLINE="2025-12-06 23:59:00"  # UTC
+          NOW=$(date -u +'%Y-%m-%d %H:%M:%S')
+          if [[ "$NOW" > "$DEADLINE" ]]; then
+            echo "expired=true" >> $GITHUB_OUTPUT
+          else
+            echo "expired=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📦 Archive repository
+        if: steps.check_deadline.outputs.expired == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+        run: |
+          echo "📦 Archiving repository..."
+          echo "🔑 Token starts with: ${GH_TOKEN:0:4}****"
+          gh auth status || gh auth login --with-token <<< "$GH_TOKEN"
+          gh api -X PATCH repos/${{ github.repository }} -f archived=true
+          echo "✅ Repository archived successfully!"
